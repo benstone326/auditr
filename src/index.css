@@ -1,30 +1,82 @@
 @import "tailwindcss";
 
-@media print {
-  .no-export {
-    display: none !important;
-  }
-}
-
-/* For html2canvas specific hiding */
-[data-html2canvas-ignore] {
-  display: none !important;
-}
-
-.export-only {
-  display: none;
-}
-
-/* We can't easily use @media print with html2canvas as it doesn't trigger print media queries */
-/* So we'll handle it via JS or specific classes if needed */
-
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #0a0a0b;
+  --color-bg2: #111114;
+  --color-bg3: #18181d;
+  --color-accent: #c8f04a;
+  --color-border: rgba(255,255,255,0.07);
+  --color-border-bright: rgba(255,255,255,0.14);
+  --color-text: #e8e8ec;
+  --color-muted: #6b6b7a;
+  --color-dim: #3a3a47;
+  --color-red: #ff5c5c;
+  --color-amber: #f5a524;
+  --color-blue: #5ca4ff;
 }
+
+@media print {
+  .no-export { display: none !important; }
+}
+
+[data-html2canvas-ignore] { display: none !important; }
 
 @layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
   body {
-    @apply bg-[#F9FAFB] text-zinc-900 antialiased;
+    background: #0a0a0b;
+    color: #e8e8ec;
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+    background-size: 80px 80px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root { position: relative; z-index: 1; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0a0a0b; }
+  ::-webkit-scrollbar-thumb { background: #3a3a47; }
 }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse2 {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.animate-fade-up  { animation: fadeUp  0.6s ease both; }
+.animate-slide-in { animation: slideIn 0.45s ease both; }
+.animate-pulse2   { animation: pulse2  2s ease-in-out infinite; }
+
+.delay-100 { animation-delay: 0.10s; }
+.delay-200 { animation-delay: 0.20s; }
+.delay-300 { animation-delay: 0.30s; }
+.delay-400 { animation-delay: 0.40s; }
+.delay-500 { animation-delay: 0.50s; }
+
+.font-display { font-family: "Syne", ui-sans-serif, system-ui, sans-serif; }

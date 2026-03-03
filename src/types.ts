@@ -1,8 +1,8 @@
 export interface DesignElement {
   id: string;
   name: string;
-  type: 'TEXT' | 'RECTANGLE' | 'COMPONENT' | 'FRAME';
-  fills: string[]; // Hex colors
+  type: string;
+  fills: string[];
   opacity: number;
   fontSize?: number;
   lineHeight?: number;
@@ -13,26 +13,49 @@ export interface DesignElement {
   borderRadius?: number;
   width: number;
   height: number;
+  itemSpacing?: number;
+}
+
+export interface ColorCluster {
+  baseColor: string;
+  variants: string[];
+  similarity: number;
+}
+
+export interface ComponentInfo {
+  name: string;
+  count: number;
+  instanceCount: number;
+  isDuplicate: boolean;
 }
 
 export interface AuditResult {
+  fileName: string;
   colors: {
     uniqueCount: number;
     uniqueFills: string[];
-    clusters: { baseColor: string; variants: string[] }[];
+    clusters: ColorCluster[];
     offPalette: string[];
   };
   typography: {
     uniqueSizes: number[];
     uniqueWeights: (string | number)[];
     lineHeightInconsistencies: { size: number; lineHeights: number[] }[];
+    fontFamilies: string[];
   };
   spacing: {
     gridBase: number;
-    violations: { elementId: string; value: number; property: string }[];
+    violations: { elementId: string; value: number; property: string; nearest: number }[];
+    allValues: { value: number; count: number; isOff: boolean }[];
+  };
+  components: {
+    all: ComponentInfo[];
+    duplicateCount: number;
   };
   summary: {
     score: number;
     criticalIssues: number;
+    warnings: number;
+    passes: number;
   };
 }
