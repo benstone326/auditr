@@ -1,0 +1,5 @@
+{
+  "name": "DesignSystem Linter",
+  "description": "A precision tool for auditing design system consistency. Detect color drift, spacing breaks, and typography inconsistencies.",
+  "requestFramePermissions": []
+}

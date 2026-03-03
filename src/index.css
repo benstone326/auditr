@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@media print {
+  .no-export {
+    display: none !important;
+  }
+}
+
+/* For html2canvas specific hiding */
+[data-html2canvas-ignore] {
+  display: none !important;
+}
+
+.export-only {
+  display: none;
+}
+
+/* We can't easily use @media print with html2canvas as it doesn't trigger print media queries */
+/* So we'll handle it via JS or specific classes if needed */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F9FAFB] text-zinc-900 antialiased;
+  }
+}
