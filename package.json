@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "auditr",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "prebuild": "node scripts/ensure-deps.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "node scripts/clean-dist.mjs",
     "prelint": "node scripts/ensure-deps.mjs",
     "lint": "tsc --noEmit",
     "verify:dist": "node scripts/verify-dist-assets.mjs"
