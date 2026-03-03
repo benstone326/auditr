@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/ensure-deps.mjs",
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "prebuild": "node scripts/ensure-deps.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "prelint": "node scripts/ensure-deps.mjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
