@@ -351,27 +351,45 @@ function AuditDashboard({ result, elements, onReset }: { result: AuditResult; el
     const el = document.getElementById('audit-report');
     if (!el) return;
     setIsExporting(true);
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 400));
     try {
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: '#0a0a0b' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
-      pdf.save(`auditr-report-${result.fileName.replace('.json','')}-${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (e) { console.error('Export failed:', e); }
-    finally { setIsExporting(false); }
+      const canvas = await html2canvas(el, {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#0a0a0b',
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+      const pdfW = 595;
+      const pdfH = Math.round((canvas.height / canvas.width) * pdfW);
+      const pdf = new jsPDF({
+        orientation: pdfH > pdfW ? 'portrait' : 'landscape',
+        unit: 'pt',
+        format: [pdfW, pdfH],
+      });
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pdfW, pdfH);
+      pdf.save(`auditr-${result.fileName.replace('.json','')}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) {
+      console.error('Export failed:', e);
+      window.print();
+    } finally {
+      setIsExporting(false);
+    }
   };
+
+  const isSubpage = activeTab !== 'overview';
 
   const tabErrors: Record<Tab, number> = {
     overview: 0,
-    colors: result.colors.clusters.filter(c=>c.variants.length>=2).length,
+    colors: result.colors.clusters.filter(c => c.variants.length >= 2).length,
     spacing: result.spacing.violations.length > 5 ? 1 : 0,
     typography: result.typography.uniqueSizes.length > 12 ? 1 : 0,
     components: result.components.duplicateCount > 3 ? 1 : 0,
   };
   const tabWarns: Record<Tab, number> = {
     overview: 0,
-    colors: result.colors.clusters.filter(c=>c.variants.length===1).length,
+    colors: result.colors.clusters.filter(c => c.variants.length === 1).length,
     spacing: result.spacing.violations.length > 0 && result.spacing.violations.length <= 5 ? result.spacing.violations.length : 0,
     typography: (result.typography.uniqueSizes.length > 8 && result.typography.uniqueSizes.length <= 12 ? 1 : 0) + result.typography.lineHeightInconsistencies.length,
     components: result.components.duplicateCount > 0 && result.components.duplicateCount <= 3 ? result.components.duplicateCount : 0,
@@ -384,93 +402,165 @@ function AuditDashboard({ result, elements, onReset }: { result: AuditResult; el
     { name: 'Components', count: result.components.duplicateCount,         color: '#c8f04a' },
   ];
 
+  // Clickable stat cards — navigate to their tab
+  const statCards = [
+    { label: 'Unique Colors',   value: result.colors.uniqueCount,           sub: 'detected', icon: <Palette className="w-4 h-4" />,    tab: 'colors'     as Tab, healthy: result.colors.clusters.length === 0 },
+    { label: 'Font Sizes',      value: result.typography.uniqueSizes.length, sub: 'in scale', icon: <TypeIcon className="w-4 h-4" />,   tab: 'typography' as Tab, healthy: result.typography.uniqueSizes.length < 10 },
+    { label: 'Grid Violations', value: result.spacing.violations.length,    sub: 'elements',  icon: <LayoutGrid className="w-4 h-4" />, tab: 'spacing'    as Tab, healthy: result.spacing.violations.length === 0 },
+    { label: 'Components',      value: result.components.all.length,        sub: 'found',     icon: <Boxes className="w-4 h-4" />,      tab: 'components' as Tab, healthy: result.components.duplicateCount === 0 },
+  ];
+
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-[rgba(10,10,11,0.85)] backdrop-blur-xl border-b border-white/[0.07]">
-        <div className="max-w-6xl mx-auto px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[#c8f04a] animate-pulse2" />
-              <span className="font-display font-extrabold text-[18px] tracking-tight text-[#e8e8ec]">Auditr</span>
-            </div>
+
+      {/* ── Sticky header with tabs built in ── */}
+      <header className="sticky top-0 z-40 bg-[rgba(10,10,11,0.92)] backdrop-blur-xl border-b border-white/[0.07]">
+
+        {/* Top row: branding + actions */}
+        <div className="max-w-6xl mx-auto px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-[#c8f04a] animate-pulse2 shrink-0" />
+            <span className="font-display font-extrabold text-[17px] tracking-tight text-[#e8e8ec]">Auditr</span>
             <span className="font-mono text-[11px] text-[#3a3a47]">/</span>
             <span className="font-mono text-[12px] text-[#6b6b7a] max-w-[200px] truncate">{result.fileName}</span>
+            {isSubpage && (
+              <>
+                <span className="font-mono text-[11px] text-[#3a3a47]">/</span>
+                <span className="font-mono text-[12px] text-[#c8f04a] capitalize">{activeTab}</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button onClick={onReset} className="font-mono text-[11px] text-[#6b6b7a] border border-white/[0.1] px-3 py-1.5 hover:text-[#e8e8ec] hover:border-white/[0.2] transition-all">
               ← New audit
             </button>
-            <button
-              onClick={handleExport} disabled={isExporting}
-              className="flex items-center gap-2 font-mono text-[11px] font-semibold px-4 py-1.5 bg-[#c8f04a] text-[#0a0a0b] hover:bg-[#d4f55e] transition-all disabled:opacity-50"
-            >
-              {isExporting ? <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <Download className="w-3.5 h-3.5" />}
+            <button onClick={handleExport} disabled={isExporting}
+              className="flex items-center gap-2 font-mono text-[11px] font-semibold px-4 py-1.5 bg-[#c8f04a] text-[#0a0a0b] hover:bg-[#d4f55e] transition-all disabled:opacity-50">
+              {isExporting
+                ? <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                : <Download className="w-3.5 h-3.5" />}
               {isExporting ? 'Exporting...' : 'Export PDF'}
             </button>
           </div>
         </div>
+
+        {/* Tab row — always visible, pill style inside container */}
+        <div data-html2canvas-ignore className="max-w-6xl mx-auto px-8 pb-2.5 flex items-center">
+          <div className="flex items-center gap-1 p-1 bg-[#0a0a0b] border border-white/[0.07] rounded-xl">
+            {TABS.map(tab => {
+              const errs = tabErrors[tab.id];
+              const warns = tabWarns[tab.id];
+              const isActive = activeTab === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-mono text-[12px] tracking-[0.02em] transition-all duration-200',
+                    isActive
+                      ? 'bg-[#e8e8ec] text-[#0a0a0b] shadow-sm'
+                      : 'text-[#6b6b7a] hover:text-[#e8e8ec] hover:bg-white/[0.06]'
+                  )}>
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  {errs > 0 && (
+                    <span className={cn('font-mono text-[9px] px-1.5 py-0.5 rounded-full leading-none',
+                      isActive ? 'bg-[#ff5c5c] text-white' : 'bg-[rgba(255,92,92,0.2)] text-[#ff5c5c]'
+                    )}>{errs}</span>
+                  )}
+                  {warns > 0 && errs === 0 && (
+                    <span className={cn('font-mono text-[9px] px-1.5 py-0.5 rounded-full leading-none',
+                      isActive ? 'bg-[#f5a524] text-[#0a0a0b]' : 'bg-[rgba(245,165,36,0.2)] text-[#f5a524]'
+                    )}>{warns}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </header>
 
-      <main id="audit-report" className="max-w-6xl mx-auto px-8 py-10">
-        {/* Score + stats */}
-        <div className="grid grid-cols-[auto_1fr] gap-8 mb-10 items-start animate-fade-up">
-          <ScoreRing score={result.summary.score} size={130} />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.07] border border-white/[0.07]">
-            {[
-              {label:'ERRORS',   value:result.summary.criticalIssues, color:'#ff5c5c', bg:'rgba(255,92,92,0.08)'},
-              {label:'WARNINGS', value:result.summary.warnings,        color:'#f5a524', bg:'rgba(245,165,36,0.08)'},
-              {label:'PASSED',   value:result.summary.passes,          color:'#c8f04a', bg:'rgba(200,240,74,0.08)'},
-              {label:'ELEMENTS', value:elements.length,                 color:'#5ca4ff', bg:'rgba(92,164,255,0.08)'},
-            ].map(s=>(
-              <div key={s.label} className="flex flex-col gap-1 p-6" style={{background:s.bg}}>
-                <span className="font-display font-extrabold text-4xl tracking-tight" style={{color:s.color}}>{s.value}</span>
-                <span className="font-mono text-[10px] tracking-[0.1em]" style={{color:s.color,opacity:.7}}>{s.label}</span>
-              </div>
+      <main id="audit-report" className="max-w-6xl mx-auto px-8 py-8">
+
+        {/* ── Score ring + clickable stat cards ── */}
+        <div className="grid grid-cols-[auto_1fr] gap-6 mb-8 items-center animate-fade-up">
+          <ScoreRing score={result.summary.score} size={120} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {statCards.map(card => (
+              <button key={card.label} onClick={() => setActiveTab(card.tab)}
+                className={cn(
+                  'group flex flex-col gap-4 p-5 border text-left transition-all duration-200 cursor-pointer',
+                  activeTab === card.tab
+                    ? 'bg-[#18181d] border-[rgba(200,240,74,0.35)]'
+                    : 'bg-[#111114] border-white/[0.07] hover:border-white/[0.18] hover:bg-[#18181d]'
+                )}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className={cn('p-1.5 rounded',
+                    card.healthy ? 'bg-[rgba(200,240,74,0.12)] text-[#c8f04a]' : 'bg-[rgba(255,92,92,0.1)] text-[#ff5c5c]'
+                  )}>
+                    {card.icon}
+                  </div>
+                  <span className={cn('font-mono text-[9px] px-2 py-0.5 border rounded-full shrink-0',
+                    card.healthy
+                      ? 'text-[#c8f04a] bg-[rgba(200,240,74,0.1)] border-[rgba(200,240,74,0.2)]'
+                      : 'text-[#f5a524] bg-[rgba(245,165,36,0.1)] border-[rgba(245,165,36,0.2)]'
+                  )}>
+                    {card.healthy ? 'Healthy' : 'Review'}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] text-[#6b6b7a] mb-1 uppercase tracking-wider">{card.label}</p>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-display font-extrabold text-[28px] tracking-tight text-[#e8e8ec]">{card.value}</span>
+                    <span className="font-mono text-[10px] text-[#3a3a47]">{card.sub}</span>
+                  </div>
+                </div>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div data-html2canvas-ignore className="flex border-b border-white/[0.07] mb-6">
-          {TABS.map(tab => {
-            const errs = tabErrors[tab.id];
-            const warns = tabWarns[tab.id];
-            const isActive = activeTab === tab.id;
-            return (
-              <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-2 px-5 py-3.5 font-mono text-[12px] tracking-[0.04em] border-b-2 transition-all duration-200',
-                  isActive ? 'border-[#c8f04a] text-[#e8e8ec]' : 'border-transparent text-[#6b6b7a] hover:text-[#e8e8ec] hover:border-white/[0.2]'
-                )}>
-                {tab.icon}
-                <span>{tab.label}</span>
-                {errs > 0 && <span className="font-mono text-[9px] px-1.5 py-0.5 bg-[rgba(255,92,92,0.15)] text-[#ff5c5c] border border-[rgba(255,92,92,0.2)]">{errs}</span>}
-                {warns > 0 && errs === 0 && <span className="font-mono text-[9px] px-1.5 py-0.5 bg-[rgba(245,165,36,0.12)] text-[#f5a524] border border-[rgba(245,165,36,0.2)]">{warns}</span>}
-              </button>
-            );
-          })}
-        </div>
+        {/* ── Back to overview breadcrumb (subpages only) ── */}
+        {isSubpage && (
+          <motion.button
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            onClick={() => setActiveTab('overview')}
+            className="flex items-center gap-2 font-mono text-[12px] text-[#6b6b7a] hover:text-[#c8f04a] transition-colors mb-6 group"
+          >
+            <span className="group-hover:-translate-x-0.5 transition-transform duration-150">←</span>
+            <span>Back to overview</span>
+          </motion.button>
+        )}
 
-        {/* Panel */}
+        {/* ── Panel ── */}
         <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}}>
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
 
             {activeTab === 'overview' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
+
                   {/* Bar chart */}
                   <div className="bg-[#111114] border border-white/[0.07] p-6">
-                    <p className="font-mono text-[10px] text-[#3a3a47] tracking-[0.08em] mb-6">ISSUE DISTRIBUTION BY MODULE</p>
+                    <p className="font-mono text-[10px] text-[#3a3a47] tracking-[0.08em] mb-6">ISSUE DISTRIBUTION — click a bar to drill in</p>
                     <div className="h-[220px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} onClick={d => { if (d?.activePayload?.[0]?.payload?.name) { const n = d.activePayload[0].payload.name.toLowerCase() as Tab; if (n !== 'overview') setActiveTab(n); } }}>
+                        <BarChart data={chartData} onClick={d => {
+                          if (d?.activePayload?.[0]?.payload?.name) {
+                            const n = d.activePayload[0].payload.name.toLowerCase() as Tab;
+                            if (n !== 'overview') setActiveTab(n);
+                          }
+                        }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b6b7a', fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
                           <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b6b7a', fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
-                          <Tooltip contentStyle={{ background: '#18181d', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, fontFamily: 'IBM Plex Mono', fontSize: 11, color: '#e8e8ec' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                          <Bar dataKey="count" radius={[2,2,0,0]} className="cursor-pointer">
-                            {chartData.map((d,i) => <Cell key={i} fill={d.color} fillOpacity={0.7} />)}
+                          <Tooltip
+                            contentStyle={{ background: '#18181d', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontFamily: 'IBM Plex Mono', fontSize: 11 }}
+                            labelStyle={{ color: '#e8e8ec', fontWeight: 600, marginBottom: 4 }}
+                            itemStyle={{ color: '#c8f04a' }}
+                            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                          />
+                          <Bar dataKey="count" radius={[2, 2, 0, 0]} className="cursor-pointer">
+                            {chartData.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.7} />)}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
@@ -481,53 +571,56 @@ function AuditDashboard({ result, elements, onReset }: { result: AuditResult; el
                   <div className="bg-[#111114] border border-white/[0.07] p-6">
                     <p className="font-mono text-[10px] text-[#3a3a47] tracking-[0.08em] mb-4">KEY FINDINGS</p>
                     <div className="space-y-1.5">
-                      {[
-                        result.colors.clusters.length > 0 && { sev:'error', msg:`${result.colors.clusters.length} near-duplicate color cluster${result.colors.clusters.length>1?'s':''} detected`, tab:'colors' as Tab },
-                        result.spacing.violations.length > 0 && { sev:'error', msg:`${result.spacing.violations.length} spacing values break the ${result.spacing.gridBase}px grid`, tab:'spacing' as Tab },
-                        result.typography.uniqueSizes.length > 8 && { sev:'warning', msg:`${result.typography.uniqueSizes.length} font sizes — aim for 6–8`, tab:'typography' as Tab },
-                        result.typography.lineHeightInconsistencies.length > 0 && { sev:'warning', msg:`${result.typography.lineHeightInconsistencies.length} line-height inconsistenc${result.typography.lineHeightInconsistencies.length>1?'ies':'y'}`, tab:'typography' as Tab },
-                        result.components.duplicateCount > 0 && { sev:'warning', msg:`${result.components.duplicateCount} potential duplicate component${result.components.duplicateCount>1?'s':''}`, tab:'components' as Tab },
-                        result.colors.clusters.length === 0 && { sev:'pass', msg:'No near-duplicate colors found', tab:'colors' as Tab },
-                        result.spacing.violations.length === 0 && { sev:'pass', msg:`All spacing follows the ${result.spacing.gridBase}px grid`, tab:'spacing' as Tab },
-                      ].filter(Boolean).map((item: any, i) => (
-                        <button key={i} onClick={()=>setActiveTab(item.tab)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 bg-[#0a0a0b] border border-white/[0.05] hover:bg-white/[0.02] transition-colors text-left">
+                      {([
+                        result.colors.clusters.length > 0   && { sev: 'error',   msg: `${result.colors.clusters.length} near-duplicate color cluster${result.colors.clusters.length > 1 ? 's' : ''} detected`,          tab: 'colors'     as Tab },
+                        result.spacing.violations.length > 0 && { sev: 'error',   msg: `${result.spacing.violations.length} spacing values break the ${result.spacing.gridBase}px grid`,                                  tab: 'spacing'    as Tab },
+                        result.typography.uniqueSizes.length > 8 && { sev: 'warning', msg: `${result.typography.uniqueSizes.length} font sizes — aim for 6–8`,                                                           tab: 'typography' as Tab },
+                        result.typography.lineHeightInconsistencies.length > 0 && { sev: 'warning', msg: `${result.typography.lineHeightInconsistencies.length} line-height inconsistenc${result.typography.lineHeightInconsistencies.length > 1 ? 'ies' : 'y'}`, tab: 'typography' as Tab },
+                        result.components.duplicateCount > 0 && { sev: 'warning', msg: `${result.components.duplicateCount} potential duplicate component${result.components.duplicateCount > 1 ? 's' : ''}`,           tab: 'components' as Tab },
+                        result.colors.clusters.length === 0  && { sev: 'pass',    msg: 'No near-duplicate colors found',                                                                                                   tab: 'colors'     as Tab },
+                        result.spacing.violations.length === 0 && { sev: 'pass',  msg: `All spacing follows the ${result.spacing.gridBase}px grid`,                                                                       tab: 'spacing'    as Tab },
+                      ] as const).filter(Boolean).map((item: any, i) => (
+                        <button key={i} onClick={() => setActiveTab(item.tab)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 bg-[#0a0a0b] border border-white/[0.05] hover:bg-white/[0.02] hover:border-white/[0.1] transition-all text-left group">
                           <span className={cn('font-mono text-[9px] px-1.5 py-0.5 border shrink-0',
-                            item.sev==='error'  ? 'text-[#ff5c5c] bg-[rgba(255,92,92,0.1)] border-[rgba(255,92,92,0.2)]'
-                            : item.sev==='warning' ? 'text-[#f5a524] bg-[rgba(245,165,36,0.1)] border-[rgba(245,165,36,0.2)]'
-                            : 'text-[#c8f04a] bg-[rgba(200,240,74,0.1)] border-[rgba(200,240,74,0.2)]')}>
-                            {item.sev==='error'?'ERROR':item.sev==='warning'?'WARN':'PASS'}
+                            item.sev === 'error'   ? 'text-[#ff5c5c] bg-[rgba(255,92,92,0.1)] border-[rgba(255,92,92,0.2)]'
+                            : item.sev === 'warning' ? 'text-[#f5a524] bg-[rgba(245,165,36,0.1)] border-[rgba(245,165,36,0.2)]'
+                            : 'text-[#c8f04a] bg-[rgba(200,240,74,0.1)] border-[rgba(200,240,74,0.2)]'
+                          )}>
+                            {item.sev === 'error' ? 'ERROR' : item.sev === 'warning' ? 'WARN' : 'PASS'}
                           </span>
                           <span className="font-mono text-[12px] text-[#e8e8ec]">{item.msg}</span>
-                          <span className="ml-auto font-mono text-[10px] text-[#3a3a47]">→ {item.tab}</span>
+                          <span className="ml-auto font-mono text-[10px] text-[#3a3a47] group-hover:text-[#6b6b7a] transition-colors">→ {item.tab}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
+                  {/* Score card */}
                   <div className="bg-[#c8f04a] p-6">
-                    <p className="font-display font-bold text-[14px] text-[#0a0a0b] mb-2">Score: {result.summary.score}/100</p>
+                    <p className="font-display font-bold text-[14px] text-[#0a0a0b] mb-1.5">Score: {result.summary.score}/100</p>
                     <p className="text-[13px] text-[#0a0a0b]/70 leading-relaxed mb-4">
-                      {result.summary.score >= 80
-                        ? 'Great shape. A few minor tweaks before handoff.'
-                        : result.summary.score >= 60
-                        ? 'Some drift detected. Address the errors before dev handoff.'
-                        : 'Significant inconsistencies found. Review all modules carefully.'}
+                      {result.summary.score >= 80 ? 'Great shape. A few minor tweaks before handoff.'
+                        : result.summary.score >= 60 ? 'Some drift detected. Address errors before dev handoff.'
+                        : 'Significant inconsistencies. Review all modules carefully.'}
                     </p>
-                    <div className="h-1 bg-[#0a0a0b]/20 w-full"><div className="h-full bg-[#0a0a0b]" style={{width:`${result.summary.score}%`}} /></div>
+                    <div className="h-1 bg-[#0a0a0b]/20 w-full">
+                      <div className="h-full bg-[#0a0a0b] transition-all duration-700" style={{ width: `${result.summary.score}%` }} />
+                    </div>
                   </div>
 
+                  {/* Audit config */}
                   <div className="bg-[#111114] border border-white/[0.07] p-5">
                     <p className="font-mono text-[10px] text-[#3a3a47] tracking-[0.08em] mb-4">AUDIT CONFIG</p>
                     <div className="space-y-3">
                       {[
-                        {l:'Grid base',v:`${result.spacing.gridBase}px`},
-                        {l:'Color tolerance',v:'8% HSL'},
-                        {l:'Max font sizes',v:'8 recommended'},
-                        {l:'Elements parsed',v:String(elements.length)},
-                      ].map(r=>(
+                        { l: 'Grid base',       v: `${result.spacing.gridBase}px` },
+                        { l: 'Color tolerance', v: '8% HSL' },
+                        { l: 'Max font sizes',  v: '8 recommended' },
+                        { l: 'Elements parsed', v: String(elements.length) },
+                      ].map(r => (
                         <div key={r.l} className="flex justify-between items-center">
                           <span className="font-mono text-[11px] text-[#6b6b7a]">{r.l}</span>
                           <span className="font-mono text-[11px] text-[#e8e8ec] bg-[#0a0a0b] border border-white/[0.05] px-2 py-0.5">{r.v}</span>
@@ -543,6 +636,7 @@ function AuditDashboard({ result, elements, onReset }: { result: AuditResult; el
             {activeTab === 'spacing'    && <SpacingPanel   data={result.spacing} elements={elements} />}
             {activeTab === 'typography' && <TypographyPanel data={result.typography} />}
             {activeTab === 'components' && <ComponentPanel  data={result.components} />}
+
           </motion.div>
         </AnimatePresence>
       </main>
