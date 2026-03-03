@@ -1,0 +1,44 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build
+        run: |
+          npm install
+          chmod +x node_modules/.bin/vite
+          npx vite build
+      - name: Zip dist
+        run: |
+          cd dist
+          zip -r ../auditr-latest.zip .
+      - name: Delete previous latest release
+        run: gh release delete latest --yes --cleanup-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Create release
+        run: |
+          gh release create latest auditr-latest.zip \
+            --title "AuditR Design Branch — Latest" \
+            --notes "Auto-built from the \`main\` branch on $(date -u '+%Y-%m-%d %H:%M UTC')" \
+            --prerelease \
+            --target main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
